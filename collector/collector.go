@@ -16,6 +16,7 @@ package collector
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strconv"
@@ -404,6 +405,34 @@ func pduToSamples(indexOids []int, pdu *gosnmp.SnmpPDU, metric *config.Metric, o
 		}
 	}
 
+	/**
+	* Here we handle exceptions and custom data types for ASR1K and Nexus 7K:
+	* Nexus 7K OIDs:
+	*  - cntpSysRootDelay: NTPSignedTimeValue
+	*  - cntpSysRootDispersion: NTPSignedTimeValue
+	*
+	* ASR1K OIDs:
+	*  - ntpEntStatusActiveOffset
+	*  - ntpEntStatusDispersion
+	 */
+	if metric.Name == "cntpSysRootDelay" {
+		t = prometheus.GaugeValue
+		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
+		fmt.Printf("cntpSysRootDelay: %v\n", value)
+	} else if metric.Name == "cntpSysRootDispersion" {
+		t = prometheus.GaugeValue
+		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
+		fmt.Printf("cntpSysRootDispersion: %v\n", value)
+	} else if metric.Name == "ntpEntStatusActiveOffset" {
+		t = prometheus.GaugeValue
+		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
+		fmt.Printf("ntpEntStatusActiveOffset: %v\n", value)
+	} else if metric.Name == "ntpEntStatusDispersion" {
+		t = prometheus.GaugeValue
+		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
+		fmt.Printf("ntpEntStatusDispersion: %v\n", value)
+	}
+
 	sample, err := prometheus.NewConstMetric(prometheus.NewDesc(metric.Name, metric.Help, labelnames, nil),
 		t, value, labelvalues...)
 	if err != nil {
@@ -412,6 +441,109 @@ func pduToSamples(indexOids []int, pdu *gosnmp.SnmpPDU, metric *config.Metric, o
 	}
 
 	return []prometheus.Metric{sample}
+}
+
+/**
+* Parses string time represantations
+* The format of this string values is one of the following:
+* "-23.4570 ms"
+* "0.01 s"
+ */
+func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
+	var result float64 = 0.
+	var bs []uint8
+
+	if pdu[:2] != "0x" {
+		return 0, fmt.Errorf("not proper formated handleNTPSignedTimeValue: %s", pdu)
+	}
+
+	/* Get only the HEX part of the string */
+	{
+		// remove "0x" and " seconds" part
+		var strValue = pdu[2:]
+		// fmt.Println(strValue)
+		// Decode string bytes to HEX
+		ba, err := hex.DecodeString(strValue)
+		if err != nil {
+			return 0, fmt.Errorf("[handleNTPStringimeValue] %s. Error: %s", strValue, err)
+		}
+		bs = ba
+		// fmt.Println("bs:" + string(bs))
+		// fmt.Printf("%T\n", bs)
+	}
+	/* Split to number and units */
+	{
+		var fields = strings.Fields(string(bs))
+		if len(fields) < 2 {
+			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected field number: %d.", len(fields))
+		}
+		// fmt.Printf("Fields: %s, %s\n", fields[0], fields[1])
+		if fields[1] == "ms" {
+			f, err := strconv.ParseFloat(fields[0], 64)
+			if err != nil {
+				return 0, fmt.Errorf("[handleNTPStringimeValue] %s. Error: %s", fields[1], err)
+			}
+			result = f
+		} else if fields[1] == "s" {
+			f, err := strconv.ParseFloat(fields[0], 64)
+			if err != nil {
+				return 0, fmt.Errorf("[handleNTPStringimeValue] %s. Error: %s", fields[1], err)
+			}
+			result = f * 1000 // Convert to milliseconds
+		} else {
+			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected unit: %s.", fields[1])
+		}
+	}
+
+	// fmt.Printf("Result: %f\n", result)
+	return result, nil
+}
+
+func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
+	var result float64 = 0.
+	var bs []uint8
+
+	if pdu[:2] != "0x" {
+		return 0, fmt.Errorf("not proper formated handleNTPSignedTimeValue: %s", pdu)
+	}
+
+	/* Get only the HEX part of the string */
+	{
+		// remove "0x" and " seconds" part
+		var strValue = pdu[2:24]
+		// fmt.Println(strValue)
+		// Decode string bytes to HEX
+		ba, err := hex.DecodeString(strValue)
+		if err != nil {
+			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", strValue, err)
+		}
+		bs = ba
+		//fmt.Println("bs:" + string(bs))
+		//fmt.Printf("%T\n", bs)
+	}
+	/* Split to integer and fraction part */
+	{
+		// Get the integer part
+		var hexInteger string = string(bs[0]) + string(bs[1]) + string(bs[3]) + string(bs[4])
+		// Get the fraction part
+		var hexFraction string = string(bs[6]) + string(bs[7]) + string(bs[9]) + string(bs[10])
+		//fmt.Printf("I: %v, F: %v\n", hexInteger, hexFraction)
+		// Convert to integers
+		i, err := strconv.ParseInt(hexInteger, 16, 64)
+		if err != nil {
+			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInteger, err)
+		}
+		f, err := strconv.ParseInt(hexFraction, 16, 64)
+		if err != nil {
+			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInteger, err)
+		}
+		// fmt.Printf("i: %v, f: %v\n", i, f)
+		// Calculate the new value
+		result = (float64(i) / 65535.) + (float64(f) / 65535.)
+		// fmt.Printf("result: %v\n", result)
+	}
+
+	return result, nil
 }
 
 func applyRegexExtracts(metric *config.Metric, pduValue string, labelnames, labelvalues []string, logger log.Logger) []prometheus.Metric {
