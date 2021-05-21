@@ -5,7 +5,7 @@ ARG GITHUB_REPO
 ENV GITHUB_REPO=$GITHUB_REPO
 WORKDIR /go/src/$GITHUB_REPO/
 COPY ./ .
-RUN go build -o .build/linux-amd64/snmp_exporter
+RUN CGO_ENABLED=0  go build -o .build/linux-amd64/snmp_exporter
 
 ################################################################################
 
