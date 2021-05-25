@@ -203,7 +203,7 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
             <head>
-            <title>SNMP Exporter</title>
+            <title>SNMP NTP Exporter</title>
             <style>
             label{
             display:inline-block;
