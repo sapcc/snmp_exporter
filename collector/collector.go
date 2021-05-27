@@ -418,13 +418,13 @@ func pduToSamples(indexOids []int, pdu *gosnmp.SnmpPDU, metric *config.Metric, o
 	if metric.Name == "snmp_n7k_cntpSysRootDelay" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
-	} else if metric.Name == "cntpSysRootDispersion" {
+	} else if metric.Name == "snmp_n7k_cntpSysRootDispersion" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
-	} else if metric.Name == "ntpEntStatusActiveOffset" {
+	} else if metric.Name == "snmp_asr04_ntpEntStatusActiveOffset" {
 		t = prometheus.GaugeValue
-		fmt.Printf("snmp_asr04_ntpEntStatusActiveOffset: %v\n", value)
-	} else if metric.Name == "ntpEntStatusDispersion" {
+		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
+	} else if metric.Name == "snmp_asr04_ntpEntStatusDispersion" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
 	}
