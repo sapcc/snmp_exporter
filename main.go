@@ -218,7 +218,7 @@ func main() {
             </style>
             </head>
             <body>
-            <h1>SNMP Exporter</h1>
+            <h1>SNMP NTP Exporter</h1>
             <form action="/snmp">
             <label>Target:</label> <input type="text" name="target" placeholder="X.X.X.X" value="1.2.3.4"><br>
             <label>Module:</label> <input type="text" name="module" placeholder="module" value="if_mib"><br>
