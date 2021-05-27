@@ -415,22 +415,21 @@ func pduToSamples(indexOids []int, pdu *gosnmp.SnmpPDU, metric *config.Metric, o
 	*  - ntpEntStatusActiveOffset
 	*  - ntpEntStatusDispersion
 	 */
-	if metric.Name == "cntpSysRootDelay" {
+	if metric.Name == "snmp_n7k_cntpSysRootDelay" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
-		fmt.Printf("cntpSysRootDelay: %v\n", value)
 	} else if metric.Name == "cntpSysRootDispersion" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPSignedTimeValue(pduValueAsString(pdu, "OctetString"), logger)
-		fmt.Printf("cntpSysRootDispersion: %v\n", value)
 	} else if metric.Name == "ntpEntStatusActiveOffset" {
 		t = prometheus.GaugeValue
-		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
-		fmt.Printf("ntpEntStatusActiveOffset: %v\n", value)
+		fmt.Printf("snmp_asr04_ntpEntStatusActiveOffset: %v\n", value)
 	} else if metric.Name == "ntpEntStatusDispersion" {
 		t = prometheus.GaugeValue
 		value, err = handleNTPStringimeValue(pduValueAsString(pdu, "OctetString"), logger)
-		fmt.Printf("ntpEntStatusDispersion: %v\n", value)
+	}
+	if err != nil {
+		level.Error(logger).Log("%v\n", err)
 	}
 
 	sample, err := prometheus.NewConstMetric(prometheus.NewDesc(metric.Name, metric.Help, labelnames, nil),
@@ -454,14 +453,14 @@ func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
 	var bs []uint8
 
 	if pdu[:2] != "0x" {
-		return 0, fmt.Errorf("not proper formated handleNTPSignedTimeValue: %s", pdu)
+		return 0, fmt.Errorf("[handleNTPStringimeValue] not proper formating: %s", pdu)
 	}
 
 	/* Get only the HEX part of the string */
 	{
 		// remove "0x" and " seconds" part
 		var strValue = pdu[2:]
-		// fmt.Println(strValue)
+		fmt.Println(strValue)
 		// Decode string bytes to HEX
 		ba, err := hex.DecodeString(strValue)
 		if err != nil {
@@ -475,7 +474,7 @@ func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
 	{
 		var fields = strings.Fields(string(bs))
 		if len(fields) < 2 {
-			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected field number: %d.", len(fields))
+			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected field number: %d", len(fields))
 		}
 		// fmt.Printf("Fields: %s, %s\n", fields[0], fields[1])
 		if fields[1] == "ms" {
@@ -491,11 +490,11 @@ func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
 			}
 			result = f * 1000 // Convert to milliseconds
 		} else {
-			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected unit: %s.", fields[1])
+			return 0, fmt.Errorf("[handleNTPStringimeValue] not expected unit: %s", fields[1])
 		}
 	}
 
-	// fmt.Printf("Result: %f\n", result)
+	level.Debug(logger).Log("[handleNTPStringimeValue] Result: %f\n", result)
 	return result, nil
 }
 
@@ -511,15 +510,15 @@ func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
 	{
 		// remove "0x" and " seconds" part
 		var strValue = pdu[2:24]
-		// fmt.Println(strValue)
+		fmt.Println(strValue)
 		// Decode string bytes to HEX
 		ba, err := hex.DecodeString(strValue)
 		if err != nil {
 			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", strValue, err)
 		}
 		bs = ba
-		//fmt.Println("bs:" + string(bs))
-		//fmt.Printf("%T\n", bs)
+		// fmt.Println("bs:" + string(bs))
+		// fmt.Printf("%T\n", bs)
 	}
 	/* Split to integer and fraction part */
 	{
@@ -527,7 +526,7 @@ func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
 		var hexInteger string = string(bs[0]) + string(bs[1]) + string(bs[3]) + string(bs[4])
 		// Get the fraction part
 		var hexFraction string = string(bs[6]) + string(bs[7]) + string(bs[9]) + string(bs[10])
-		//fmt.Printf("I: %v, F: %v\n", hexInteger, hexFraction)
+		// fmt.Printf("I: %v, F: %v\n", hexInteger, hexFraction)
 		// Convert to integers
 		i, err := strconv.ParseInt(hexInteger, 16, 64)
 		if err != nil {
@@ -543,6 +542,7 @@ func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
 		// fmt.Printf("result: %v\n", result)
 	}
 
+	level.Debug(logger).Log("[handleNTPSignedTimeValue] Result: %f\n", result)
 	return result, nil
 }
 
