@@ -500,47 +500,24 @@ func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
 
 func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
 	var result float64 = 0.
-	var bs []uint8
 
 	if pdu[:2] != "0x" {
 		return 0, fmt.Errorf("not proper formated handleNTPSignedTimeValue: %s", pdu)
 	}
-
-	/* Get only the HEX part of the string */
-	{
-		// remove "0x" and " seconds" part
-		var strValue = pdu[2:24]
-		fmt.Println(strValue)
-		// Decode string bytes to HEX
-		ba, err := hex.DecodeString(strValue)
-		if err != nil {
-			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", strValue, err)
-		}
-		bs = ba
-		// fmt.Println("bs:" + string(bs))
-		// fmt.Printf("%T\n", bs)
-	}
 	/* Split to integer and fraction part */
-	{
-		// Get the integer part
-		var hexInteger string = string(bs[0]) + string(bs[1]) + string(bs[3]) + string(bs[4])
-		// Get the fraction part
-		var hexFraction string = string(bs[6]) + string(bs[7]) + string(bs[9]) + string(bs[10])
-		// fmt.Printf("I: %v, F: %v\n", hexInteger, hexFraction)
-		// Convert to integers
-		i, err := strconv.ParseInt(hexInteger, 16, 64)
-		if err != nil {
-			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInteger, err)
-		}
-		f, err := strconv.ParseInt(hexFraction, 16, 64)
-		if err != nil {
-			return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInteger, err)
-		}
-		// fmt.Printf("i: %v, f: %v\n", i, f)
-		// Calculate the new value
-		result = (float64(i) / 65535.) + (float64(f) / 65535.)
-		// fmt.Printf("result: %v\n", result)
+	// Convert to integers
+	var hexInt string = pdu[2:6]
+	i, err := strconv.ParseInt(hexInt, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInt, err)
 	}
+	hexInt = pdu[6:]
+	f, err := strconv.ParseInt(hexInt, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInt, err)
+	}
+	// Calculate the new value and convert to milliseconds
+	result = ((float64(i) / 65535.) + (float64(f) / 65535.)) / 1000
 
 	level.Debug(logger).Log("[handleNTPSignedTimeValue] Result: %f\n", result)
 	return result, nil
