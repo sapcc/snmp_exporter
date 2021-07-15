@@ -517,7 +517,7 @@ func handleNTPSignedTimeValue(pdu string, logger log.Logger) (float64, error) {
 		return 0, fmt.Errorf("[handleNTPSignedTimeValue] %s. Error: %s", hexInt, err)
 	}
 	// Calculate the new value and convert to milliseconds
-	result = ((float64(i) / 65535.) + (float64(f) / 65535.)) * 1000
+	result = float64(i) + (float64(f) / 65535.)
 
 	level.Debug(logger).Log("[handleNTPSignedTimeValue] Result: %f\n", result)
 	return result, nil
