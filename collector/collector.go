@@ -460,7 +460,7 @@ func handleNTPStringimeValue(pdu string, logger log.Logger) (float64, error) {
 	{
 		// remove "0x" and " seconds" part
 		var strValue = pdu[2:]
-		fmt.Println(strValue)
+		// fmt.Println(strValue)
 		// Decode string bytes to HEX
 		ba, err := hex.DecodeString(strValue)
 		if err != nil {
